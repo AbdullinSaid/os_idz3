@@ -10,9 +10,9 @@
 #include <sys/ipc.h>
 #include <sys/wait.h>
 
-void *ThreadMain(void *arg);            /* Main program of a thread */
+void *ThreadMain(void *arg);
  
-#define MAXPENDING 5    /* Maximum outstanding connection requests */
+#define MAXPENDING 5
  
 void DieWithError(char *errorMessage)
 {
@@ -22,34 +22,29 @@ void DieWithError(char *errorMessage)
  
 int CreateTCPServerSocket(unsigned short port)
 {
-    int sock;                        /* socket to create */
-    struct sockaddr_in servAddr; /* Local address */
+    int sock;
+    struct sockaddr_in servAddr;
  
-    /* Create socket for incoming connections */
     if ((sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
         DieWithError("socket() failed");
  
-    /* Construct local address structure */
-    memset(&servAddr, 0, sizeof(servAddr));   /* Zero out structure */
-    servAddr.sin_family = AF_INET;                /* Internet address family */
-    servAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
-    servAddr.sin_port = htons(port);              /* Local port */
- 
-    /* Bind to the local address */
+    memset(&servAddr, 0, sizeof(servAddr));
+    servAddr.sin_family = AF_INET;
+    servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servAddr.sin_port = htons(port);
+
     if (bind(sock, (struct sockaddr *) &servAddr, sizeof(servAddr)) < 0)
         DieWithError("bind() failed");
  
-    /* Mark the socket so it will listen for incoming connections */
     if (listen(sock, MAXPENDING) < 0)
         DieWithError("listen() failed");
  
     return sock;
 }
 
-/* Structure of arguments to pass to client thread */
 struct ThreadArgs
 {
-    int clntSock;                      /* Socket descriptor for client */
+    int clntSock;
 };
 
 #define MAX_BOOKS 50
@@ -79,9 +74,9 @@ void sigint_handler(int signum) {
 
 int AcceptTCPConnection(int servSock)
 {
-    int clntSock;                    /* Socket descriptor for client */
-    struct sockaddr_in echoClntAddr; /* Client address */
-    unsigned int clntLen;            /* Length of client address data structure */
+    int clntSock; 
+    struct sockaddr_in echoClntAddr;
+    unsigned int clntLen;
 
     /* Set the size of the in-out parameter */
     clntLen = sizeof(echoClntAddr);
@@ -101,8 +96,8 @@ int AcceptTCPConnection(int servSock)
 
 void HandleTCPClient(int clntSocket)
 {
-    char messageBuffer[RCVBUFSIZE];        /* Buffer for echo string */
-    int recvMsgSize;                    /* Size of received message */
+    char messageBuffer[RCVBUFSIZE];
+    int recvMsgSize;
     int sendMsgSize;
     /* Receive message from client */
     if ((recvMsgSize = recv(clntSocket, messageBuffer, RCVBUFSIZE, 0)) < 0) {
@@ -128,7 +123,7 @@ void HandleTCPClient(int clntSocket)
     monitorBufferSize += snprintf(monitorBuffer + monitorBufferSize, RCVBUFSIZE, "Server sent to Client %d number of books %d\n", clntSocket, booksNum);
     semop(semMonitorBuffer, &sem_signal, 1);
     if (clientType == '0') { /* library reader client */
-        while (recvMsgSize > 0) { /* zero indicates end of transmission */
+        while (recvMsgSize > 0) {
             if ((recvMsgSize = recv(clntSocket, messageBuffer, RCVBUFSIZE, 0)) < 0) {
                 DieWithError("recv() failed");
             }
@@ -164,7 +159,6 @@ void HandleTCPClient(int clntSocket)
             semop(semMonitorBuffer, &sem_wait, 1);
             while (startMonitorIndex < monitorBufferSize) {
                 sleep(1);
-                printf("%d %d\n", startMonitorIndex, monitorBufferSize);
                 if (monitorBufferSize - startMonitorIndex <= RCVBUFSIZE) {
                     startMonitorIndex += send(clntSocket, monitorBuffer + startMonitorIndex, monitorBufferSize - startMonitorIndex, 0);
                 } else {
@@ -184,13 +178,13 @@ void HandleTCPClient(int clntSocket)
 
 int main(int argc, char *argv[])
 {
-    int servSock;                    /* Socket descriptor for server */
-    int clntSock;                    /* Socket descriptor for client */
-    unsigned short servPort;     /* Server port */
-    pthread_t threadID;              /* Thread ID from pthread_create() */
-    struct ThreadArgs *threadArgs;   /* Pointer to argument structure for thread */
+    int servSock; 
+    int clntSock;
+    unsigned short servPort;
+    pthread_t threadID;
+    struct ThreadArgs *threadArgs;
 
-    if (argc != 3)     /* Test for correct number of arguments */
+    if (argc != 3)
     {
         fprintf(stderr,"Usage: %s <SERVER PORT> <NUMBER OF BOOKS>\n", argv[0]);
         exit(1);
@@ -199,7 +193,7 @@ int main(int argc, char *argv[])
     signal(SIGINT, sigint_handler);
     signal(SIGTERM, sigint_handler);
     
-    servPort = atoi(argv[1]);  /* First arg:  local port */
+    servPort = atoi(argv[1]);
     booksNum = atoi(argv[2]);
 
     if ((semMonitorBuffer = semget(123, 1, IPC_CREAT | 0666)) == -1) {
@@ -223,17 +217,15 @@ int main(int argc, char *argv[])
     monitorBufferSize = 0;
     servSock = CreateTCPServerSocket(servPort);
 
-    for (;;) /* run forever */
+    for (;;)
     {
         clntSock = AcceptTCPConnection(servSock);
 
-        /* Create separate memory for client argument */
         if ((threadArgs = (struct ThreadArgs *) malloc(sizeof(struct ThreadArgs)))
                == NULL)
             DieWithError("malloc() failed");
         threadArgs -> clntSock = clntSock;
 
-        /* Create client thread */
         if (pthread_create(&threadID, NULL, ThreadMain, (void *) threadArgs) != 0)
             DieWithError("pthread_create() failed");
         printf("with thread %ld\n", (long int) threadID);
@@ -243,14 +235,12 @@ int main(int argc, char *argv[])
 
 void *ThreadMain(void *threadArgs)
 {
-    int clntSock;                   /* Socket descriptor for client connection */
+    int clntSock;
 
-    /* Guarantees that thread resources are deallocated upon return */
     pthread_detach(pthread_self());
 
-    /* Extract socket file descriptor from argument */
     clntSock = ((struct ThreadArgs *) threadArgs) -> clntSock;
-    free(threadArgs);              /* Deallocate memory for argument */
+    free(threadArgs);
 
     HandleTCPClient(clntSock);
 
